@@ -665,8 +665,8 @@ open class Chart: UIControl {
             label.sizeToFit()
 
             if yLabelsOnRightSide {
-                label.frame.origin.x = drawingWidth
-                label.frame.origin.x -= label.frame.width + padding
+                label.frame.origin.x = drawingWidth + 5
+                //label.frame.origin.x -= label.frame.width + padding
             }
 
             // Labels should be placed above the horizontal grid
