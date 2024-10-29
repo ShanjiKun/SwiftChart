@@ -105,6 +105,28 @@ open class Chart: UIControl {
     values.
     */
     open var yLabels: [Double]?
+    
+    /**
+    Custom 6 yLabels
+    */
+    open var finalYLabels: [Double] {
+        if let yLabels = yLabels {
+            return yLabels
+        } else {
+            //labels = [(min.y + max.y) / 2, max.y]
+            let diff = max.y - min.y
+            let label2 = (diff / 5) + min.y
+            let label3 = (diff / 5) * 2 + min.y
+            let label4 = (diff / 5) * 3 + min.y
+            let label5 = (diff / 5) * 4 + min.y
+            
+            var labels = [label2, label3, label4, label5, max.y]
+            if yLabelsOnRightSide || min.y != 0 {
+                labels.insert(min.y, at: 0)
+            }
+            return labels
+        }
+    }
 
     /**
     Formatter for the labels on the y-axis.
@@ -633,22 +655,7 @@ open class Chart: UIControl {
         context.setStrokeColor(gridColor.cgColor)
         context.setLineWidth(0.5)
 
-        var labels: [Double]
-        if yLabels == nil {
-            //labels = [(min.y + max.y) / 2, max.y]
-            let diff = max.y - min.y
-            let label2 = (diff / 5) + min.y
-            let label3 = (diff / 5) * 2 + min.y
-            let label4 = (diff / 5) * 3 + min.y
-            let label5 = (diff / 5) * 4 + min.y
-            labels = [label2, label3, label4, label5, max.y]
-            if yLabelsOnRightSide || min.y != 0 {
-                labels.insert(min.y, at: 0)
-            }
-        } else {
-            labels = yLabels!
-        }
-
+        let labels = finalYLabels
         let scaled = scaleValuesOnYAxis(labels)
         let padding: CGFloat = 5
         let zero = CGFloat(getZeroValueOnYAxis(zeroLevel: 0))
