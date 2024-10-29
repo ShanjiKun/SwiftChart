@@ -20,6 +20,9 @@ class BasicChartViewController: UIViewController, ChartDelegate {
         // Draw the chart selected from the TableViewController
         
         chart.delegate = self
+        chart.hideVerticalXForEachLabel = true
+        chart.yLabelsOnRightSide = true
+        chart.yLabelsFormatter = { i, value in String(value) }
 
         switch selectedChart {
         case 0:
@@ -36,6 +39,7 @@ class BasicChartViewController: UIViewController, ChartDelegate {
           ]
           let series = ChartSeries(data: data)
           series.area = true
+            
           chart.xLabels = [0, 3, 6, 9, 12, 15, 18, 21, 24]
           chart.xLabelsFormatter = { String(Int(round($1))) + "h" }
           chart.add(series)

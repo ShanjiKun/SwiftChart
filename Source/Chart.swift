@@ -209,6 +209,11 @@ open class Chart: UIControl {
     Alpha component for the area color.
     */
     open var areaAlphaComponent: CGFloat = 0.1
+    
+    /**
+    Hide the verticel grid for each label
+    */
+    open var hideVerticalXForEachLabel = false
 
     // MARK: Private variables
 
@@ -552,8 +557,10 @@ open class Chart: UIControl {
 
     fileprivate func drawLabelsAndGridOnXAxis() {
         let context = UIGraphicsGetCurrentContext()!
-        context.setStrokeColor(gridColor.cgColor)
-        context.setLineWidth(0.5)
+        if !hideVerticalXForEachLabel {
+            context.setStrokeColor(gridColor.cgColor)
+            context.setLineWidth(0.5)
+        }
 
         var labels: [Double]
         if xLabels == nil {
@@ -572,7 +579,7 @@ open class Chart: UIControl {
 
             // Add vertical grid for each label, except axes on the left and right
 
-            if x != 0 && x != drawingWidth {
+            if !hideVerticalXForEachLabel, x != 0, x != drawingWidth {
                 context.move(to: CGPoint(x: x, y: CGFloat(0)))
                 context.addLine(to: CGPoint(x: x, y: bounds.height))
                 context.strokePath()
@@ -628,7 +635,13 @@ open class Chart: UIControl {
 
         var labels: [Double]
         if yLabels == nil {
-            labels = [(min.y + max.y) / 2, max.y]
+            //labels = [(min.y + max.y) / 2, max.y]
+            let diff = max.y - min.y
+            let label2 = (diff / 5) + min.y
+            let label3 = (diff / 5) * 2 + min.y
+            let label4 = (diff / 5) * 3 + min.y
+            let label5 = (diff / 5) * 4 + min.y
+            labels = [label2, label3, label4, label5, max.y]
             if yLabelsOnRightSide || min.y != 0 {
                 labels.insert(min.y, at: 0)
             }
