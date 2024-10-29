@@ -699,6 +699,7 @@ open class Chart: UIControl {
             shapeLayer.strokeColor = highlightLineColor.cgColor
             shapeLayer.fillColor = nil
             shapeLayer.lineWidth = highlightLineWidth
+            shapeLayer.lineDashPattern = [2, 4]
 
             highlightShapeLayer = shapeLayer
             layer.addSublayer(shapeLayer)
@@ -710,6 +711,8 @@ open class Chart: UIControl {
         let point = touches.first!
         let left = point.location(in: self).x
         let x = valueFromPointAtX(left)
+        
+        //print("Check 1", x, left, drawingWidth)
 
         if left < 0 || left > (drawingWidth as CGFloat) {
             // Remove highlight line at the end of the touch event
@@ -720,24 +723,37 @@ open class Chart: UIControl {
             return
         }
 
-        drawHighlightLineFromLeftPosition(left)
+        //drawHighlightLineFromLeftPosition(left)
 
         if delegate == nil {
             return
         }
 
-        var indexes: [Int?] = []
+        //var indexes: [Int?] = []
+        var indexes: [Int] = []
 
         for series in self.series {
-            var index: Int? = nil
             let xValues = series.data.map({ (point: ChartPoint) -> Double in
-                return point.x })
+                return point.x
+            })
             let closest = Chart.findClosestInValues(xValues, forValue: x)
+            /*
             if closest.lowestIndex != nil && closest.highestIndex != nil {
                 // Consider valid only values on the right
                 index = closest.lowestIndex
             }
             indexes.append(index)
+            */
+            
+            if let index = closest.lowestIndex {
+                indexes.append(index)
+            }
+        }
+        if let firstIndex = indexes.first, let series = series.first {
+            let value = series.data[firstIndex].x
+            let left = pointXFromValue(value)
+            //print("Check 2", value, left)
+            drawHighlightLineFromLeftPosition(left)
         }
         delegate!.didTouchChart(self, indexes: indexes, x: x, left: left)
     }
@@ -770,6 +786,10 @@ open class Chart: UIControl {
     fileprivate func valueFromPointAtY(_ y: CGFloat) -> Double {
         let value = ((max.y - min.y) / Double(drawingHeight)) * Double(y) + min.y
         return -value
+    }
+    
+    fileprivate func pointXFromValue(_ value: Double) -> CGFloat {
+        return (value - min.x) / ((max.x-min.x) / Double(drawingWidth))
     }
 
     fileprivate class func findClosestInValues(
