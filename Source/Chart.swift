@@ -371,6 +371,7 @@ open class Chart: UIControl {
         max = minMax.max
 
         highlightLineShapeLayer = nil
+        highlightCircleShapeLayer = nil
         
         yOffsetFromXValuesForEachSeries = []
 
