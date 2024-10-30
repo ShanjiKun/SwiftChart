@@ -320,6 +320,15 @@ open class Chart: UIControl {
         let series = self.series[seriesIndex] as ChartSeries
         return series.data[dataIndex!].y
     }
+    
+    /**
+    Remove all the series.
+    */
+    open func hideHighlight() {
+        if let shapeLayer = highlightShapeLayer {
+            shapeLayer.path = nil
+        }
+    }
 
     fileprivate func drawIBPlaceholder() {
         let placeholder = UIView(frame: self.frame)
@@ -736,9 +745,9 @@ open class Chart: UIControl {
 
         if left < 0 || left > (drawingWidth as CGFloat) {
             // Remove highlight line at the end of the touch event
-            if let shapeLayer = highlightShapeLayer {
-                shapeLayer.path = nil
-            }
+//            if let shapeLayer = highlightShapeLayer {
+//                shapeLayer.path = nil
+//            }
             delegate?.didFinishTouchingChart(self)
             return
         }
