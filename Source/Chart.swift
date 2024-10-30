@@ -223,9 +223,19 @@ open class Chart: UIControl {
     open var highlightLineWidth: CGFloat = 0.5
 
     /**
+    Color for the highlight circle.
+    */
+    open var highlightCirleColor = UIColor.gray
+    
+    /**
+    Width for the highlight circle.
+    */
+    open var highlightCircleWidth: CGFloat = 8
+    
+    /**
     Hide the highlight line when touch event ends, e.g. when stop swiping over the chart
     */
-    open var hideHighlightLineOnTouchEnd = false
+    open var hideHighlightOnTouchEnd = false
 
     /**
     Alpha component for the area color.
@@ -239,7 +249,8 @@ open class Chart: UIControl {
 
     // MARK: Private variables
 
-    fileprivate var highlightShapeLayer: CAShapeLayer!
+    fileprivate var highlightLineShapeLayer: CAShapeLayer!
+    fileprivate var highlightCircleShapeLayer: CAShapeLayer!
     fileprivate var layerStore: [CAShapeLayer] = []
 
     fileprivate var drawingHeight: CGFloat!
@@ -248,6 +259,8 @@ open class Chart: UIControl {
     // Minimum and maximum values represented in the chart
     fileprivate var min: ChartPoint!
     fileprivate var max: ChartPoint!
+    
+    private var yOffsetFromXValuesForEachSeries = [[Double: Double]]()
 
     // Represent a set of points corresponding to a segment line on the chart.
     typealias ChartLineSegment = [ChartPoint]
@@ -325,7 +338,10 @@ open class Chart: UIControl {
     Remove all the series.
     */
     open func hideHighlight() {
-        if let shapeLayer = highlightShapeLayer {
+        if let shapeLayer = highlightLineShapeLayer {
+            shapeLayer.path = nil
+        }
+        if let shapeLayer = highlightCircleShapeLayer {
             shapeLayer.path = nil
         }
     }
@@ -354,7 +370,9 @@ open class Chart: UIControl {
         min = minMax.min
         max = minMax.max
 
-        highlightShapeLayer = nil
+        highlightLineShapeLayer = nil
+        
+        yOffsetFromXValuesForEachSeries = []
 
         // Remove things before drawing, e.g. when changing orientation
 
@@ -367,15 +385,19 @@ open class Chart: UIControl {
         layerStore.removeAll()
 
         // Draw content
-
+        
         for (index, series) in self.series.enumerated() {
 
             // Separate each line in multiple segments over and below the x axis
             let segments = Chart.segmentLine(series.data as ChartLineSegment, zeroLevel: series.colors.zeroLevel)
-
+            let allPointInSegments = segments.reduce([], +)
+            var allScaledValuesOnYAxisInSegements = [Double]()
+            var yOffsetFromXValueMap = [Double: Double]()
+            
             segments.forEach({ segment in
                 let scaledXValues = scaleValuesOnXAxis( segment.map { $0.x } )
                 let scaledYValues = scaleValuesOnYAxis( segment.map { $0.y } )
+                allScaledValuesOnYAxisInSegements.append(contentsOf: scaledYValues)
 
                 if series.line {
                     drawLine(scaledXValues, yValues: scaledYValues, seriesIndex: index)
@@ -384,6 +406,13 @@ open class Chart: UIControl {
                     drawArea(scaledXValues, yValues: scaledYValues, seriesIndex: index)
                 }
             })
+            
+            allPointInSegments.enumerated().forEach { i, point in
+                if series.data.contains(where: { $0.x == point.x } ), i < allScaledValuesOnYAxisInSegements.count {
+                    yOffsetFromXValueMap.updateValue(allScaledValuesOnYAxisInSegements[i], forKey: point.x)
+                }
+            }
+            yOffsetFromXValuesForEachSeries.append(yOffsetFromXValueMap)
         }
 
         drawAxes()
@@ -708,8 +737,8 @@ open class Chart: UIControl {
 
     // MARK: - Touch events
 
-    fileprivate func drawHighlightLineFromLeftPosition(_ left: CGFloat) {
-        if let shapeLayer = highlightShapeLayer {
+    fileprivate func drawHighlightLine(from left: CGFloat) {
+        if let shapeLayer = highlightLineShapeLayer {
             // Use line already created
             let path = CGMutablePath()
 
@@ -730,7 +759,29 @@ open class Chart: UIControl {
             shapeLayer.lineWidth = highlightLineWidth
             shapeLayer.lineDashPattern = [2, 4]
 
-            highlightShapeLayer = shapeLayer
+            highlightLineShapeLayer = shapeLayer
+            layer.addSublayer(shapeLayer)
+            layerStore.append(shapeLayer)
+        }
+    }
+    
+    private func drawHighlightCirle(from left: CGFloat, and top: CGFloat) {
+        let x = left - highlightCircleWidth / 2
+        let y = top - highlightCircleWidth / 2
+        if let shapeLayer = highlightCircleShapeLayer {
+            // Use line already created
+            let path = UIBezierPath(ovalIn: .init(x: x, y: y, width: highlightCircleWidth, height: highlightCircleWidth))
+            shapeLayer.path = path.cgPath
+        } else {
+            // Create the line
+            let path = UIBezierPath(ovalIn: .init(x: x, y: y, width: highlightCircleWidth, height: highlightCircleWidth))
+            let shapeLayer = CAShapeLayer()
+            shapeLayer.frame = self.bounds
+            shapeLayer.path = path.cgPath
+            shapeLayer.strokeColor = nil
+            shapeLayer.fillColor = highlightCirleColor.cgColor
+
+            highlightCircleShapeLayer = shapeLayer
             layer.addSublayer(shapeLayer)
             layerStore.append(shapeLayer)
         }
@@ -745,14 +796,17 @@ open class Chart: UIControl {
 
         if left < 0 || left > (drawingWidth as CGFloat) {
             // Remove highlight line at the end of the touch event
-//            if let shapeLayer = highlightShapeLayer {
+//            if let shapeLayer = highlightLineShapeLayer {
+//                shapeLayer.path = nil
+//            }
+//            if let shapeLayer = highlightCircleShapeLayer {
 //                shapeLayer.path = nil
 //            }
             delegate?.didFinishTouchingChart(self)
             return
         }
 
-        //drawHighlightLineFromLeftPosition(left)
+        //drawHighlightLine(from: left)
 
         if delegate == nil {
             return
@@ -774,15 +828,32 @@ open class Chart: UIControl {
             indexes.append(index)
             */
             
-            if let index = closest.lowestIndex {
-                indexes.append(index)
+            if let lowestIndex = closest.lowestIndex {
+                if let highestIndex = closest.highestIndex {
+                    let lowestValue = series.data[lowestIndex].x
+                    let highestValue = series.data[highestIndex].x
+                    if abs(lowestValue - x) < abs(highestValue - x) {
+                        indexes.append(lowestIndex)
+                    } else {
+                        indexes.append(highestIndex)
+                    }
+                } else {
+                    indexes.append(lowestIndex)
+                }
+            } else if let highestIndex = closest.highestIndex {
+                indexes.append(highestIndex)
             }
         }
         if let firstIndex = indexes.first, let series = series.first {
             let value = series.data[firstIndex].x
             let left = pointXFromValue(value)
             //print("Check 2", value, left)
-            drawHighlightLineFromLeftPosition(left)
+            drawHighlightLine(from: left)
+            
+            if let yOffset = yOffsetFromXValuesForEachSeries.first?[value] {
+                //print("Check 3", value, yOffset)
+                drawHighlightCirle(from: left, and: yOffset)
+            }
         }
         delegate!.didTouchChart(self, indexes: indexes, x: x, left: left)
     }
@@ -793,8 +864,11 @@ open class Chart: UIControl {
 
     override open func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         handleTouchEvents(touches, event: event)
-        if self.hideHighlightLineOnTouchEnd {
-            if let shapeLayer = highlightShapeLayer {
+        if self.hideHighlightOnTouchEnd {
+            if let shapeLayer = highlightLineShapeLayer {
+                shapeLayer.path = nil
+            }
+            if let shapeLayer = highlightCircleShapeLayer {
                 shapeLayer.path = nil
             }
         }
